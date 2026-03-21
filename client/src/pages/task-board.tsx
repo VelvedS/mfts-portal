@@ -29,6 +29,29 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
 import type { Phase, Task, TeamMember, Comment } from "@shared/schema";
 
+function LinkifyText({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s<]+)/g);
+  return (
+    <p className="text-sm text-foreground/90 mt-1 leading-relaxed">
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2 hover:text-primary/80 break-all"
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </p>
+  );
+}
+
 function PriorityDot({ priority }: { priority: string }) {
   const colors: Record<string, string> = {
     urgent: "bg-red-500",
@@ -360,7 +383,7 @@ function TaskDetailPanel({
                               {time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                             </span>
                           </div>
-                          <p className="text-sm text-foreground/90 mt-1 leading-relaxed">{comment.content}</p>
+                          <LinkifyText text={comment.content} />
                         </div>
                       </div>
                     );
