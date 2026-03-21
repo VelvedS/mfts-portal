@@ -8,7 +8,7 @@
   ],
   "functions": {
     "api/**/*.ts": {
-      "includeFiles": "api/_*.ts,shared/**/*.ts"
+      "runtime": "@vercel/node"
     }
   }
 }
