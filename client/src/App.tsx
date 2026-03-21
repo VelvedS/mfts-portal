@@ -10,6 +10,7 @@ import Dashboard from "@/pages/dashboard";
 import TaskBoard from "@/pages/task-board";
 import Timeline from "@/pages/timeline";
 import TeamManagement from "@/pages/team-management";
+import FilesPage from "@/pages/files";
 import LoginPage from "@/pages/login";
 import AppLayout from "@/components/app-layout";
 import { Loader2 } from "lucide-react";
@@ -32,6 +33,7 @@ function PortalRoutes() {
         <Route path="/tasks" component={TaskBoard} />
         <Route path="/timeline" component={Timeline} />
         <Route path="/team" component={TeamManagement} />
+        <Route path="/files" component={FilesPage} />
         <Route path="/admin" component={AdminLogin} />
         <Route component={NotFound} />
       </Switch>

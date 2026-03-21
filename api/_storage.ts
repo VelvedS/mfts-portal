@@ -1,12 +1,13 @@
 import { eq, asc } from "drizzle-orm";
 import { getDb } from "./_db.js";
 import {
-  users, teamMembers, phases, tasks, comments,
+  users, teamMembers, phases, tasks, comments, files,
   type User, type InsertUser,
   type TeamMember, type InsertTeamMember,
   type Phase, type InsertPhase,
   type Task, type InsertTask,
   type Comment, type InsertComment,
+  type ProjectFile, type InsertFile,
 } from "../shared/schema.js";
 
 // Serverless storage — creates a fresh db handle per invocation
@@ -121,6 +122,30 @@ export class Storage {
   async deleteComment(id: number): Promise<boolean> {
     const result = await this.db.delete(comments).where(eq(comments.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Files
+  async getFiles(): Promise<ProjectFile[]> {
+    return this.db.select().from(files).orderBy(asc(files.createdAt));
+  }
+
+  async getFilesByTask(taskId: number): Promise<ProjectFile[]> {
+    return this.db.select().from(files).where(eq(files.taskId, taskId)).orderBy(asc(files.createdAt));
+  }
+
+  async createFile(file: InsertFile): Promise<ProjectFile> {
+    const [created] = await this.db.insert(files).values(file).returning();
+    return created;
+  }
+
+  async deleteFile(id: number): Promise<ProjectFile | undefined> {
+    const [deleted] = await this.db.delete(files).where(eq(files.id, id)).returning();
+    return deleted;
+  }
+
+  async getFile(id: number): Promise<ProjectFile | undefined> {
+    const [file] = await this.db.select().from(files).where(eq(files.id, id));
+    return file;
   }
 }
 

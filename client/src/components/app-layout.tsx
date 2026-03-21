@@ -4,6 +4,7 @@ import {
   KanbanSquare, 
   CalendarDays,
   Users,
+  FolderOpen,
   Leaf,
   ChevronLeft,
   ChevronRight,
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/tasks", label: "Tasks", icon: KanbanSquare },
   { href: "/timeline", label: "Timeline", icon: CalendarDays },
   { href: "/team", label: "Team", icon: Users },
+  { href: "/files", label: "Files", icon: FolderOpen },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

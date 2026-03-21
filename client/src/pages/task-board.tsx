@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth-context";
 import type { Phase, Task, TeamMember, Comment } from "@shared/schema";
+import FileUpload from "@/components/file-upload";
 
 function LinkifyText({ text }: { text: string }) {
   const parts = text.split(/(https?:\/\/[^\s<]+)/g);
@@ -158,6 +159,12 @@ function TaskDetailPanel({
   const { data: comments, isLoading: commentsLoading } = useQuery<Comment[]>({
     queryKey: ["/api/tasks", task.id, "comments"],
   });
+
+  const { data: taskFiles = [] } = useQuery<any[]>({
+    queryKey: ["/api/tasks", task.id, "files"],
+  });
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
 
   const clientMembers = team.filter(m => m.isClient);
   const authErrorMsg = "Sign in at Team Login to make changes";
@@ -367,6 +374,16 @@ function TaskDetailPanel({
                 />
               </div>
             </div>
+
+            <Separator />
+
+            {/* Files */}
+            <FileUpload
+              taskId={task.id}
+              files={taskFiles}
+              teamMembers={team.map(m => ({ id: m.id, name: m.name, avatarInitials: m.avatarInitials }))}
+              supabaseUrl={supabaseUrl}
+            />
 
             <Separator />
 

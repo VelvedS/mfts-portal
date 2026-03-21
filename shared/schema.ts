@@ -62,12 +62,25 @@ export const comments = pgTable("comments", {
   createdAt: text("created_at").notNull(),
 });
 
+// Files attached to tasks (stored in Supabase Storage)
+export const files = pgTable("files", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull(),
+  name: text("name").notNull(),
+  storagePath: text("storage_path").notNull(),
+  size: integer("size").notNull().default(0),
+  mimeType: text("mime_type"),
+  uploadedBy: integer("uploaded_by").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertTeamMemberSchema = createInsertSchema(teamMembers).omit({ id: true });
 export const insertPhaseSchema = createInsertSchema(phases).omit({ id: true });
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true });
 export const insertCommentSchema = createInsertSchema(comments).omit({ id: true });
+export const insertFileSchema = createInsertSchema(files).omit({ id: true });
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -75,9 +88,11 @@ export type InsertTeamMember = z.infer<typeof insertTeamMemberSchema>;
 export type InsertPhase = z.infer<typeof insertPhaseSchema>;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
+export type InsertFile = z.infer<typeof insertFileSchema>;
 
 export type User = typeof users.$inferSelect;
 export type TeamMember = typeof teamMembers.$inferSelect;
 export type Phase = typeof phases.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
+export type ProjectFile = typeof files.$inferSelect;
