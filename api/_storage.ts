@@ -36,7 +36,7 @@ export class Storage {
 
   // Team Members
   async getTeamMembers(): Promise<TeamMember[]> {
-    return this.db.select().from(teamMembers);
+    return this.db.select().from(teamMembers).orderBy(asc(teamMembers.sortOrder));
   }
 
   async getTeamMember(id: number): Promise<TeamMember | undefined> {

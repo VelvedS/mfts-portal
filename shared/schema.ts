@@ -22,6 +22,7 @@ export const teamMembers = pgTable("team_members", {
   email: text("email"),
   avatarInitials: text("avatar_initials").notNull(),
   isClient: boolean("is_client").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
 });
 
 // Project phases / milestones

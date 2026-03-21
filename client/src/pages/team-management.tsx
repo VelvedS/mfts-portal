@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -208,6 +208,27 @@ export default function TeamManagement() {
   const canManage =
     isAuthenticated && (user?.role === "admin" || user?.role === "team");
 
+  const reorderMembers = useMutation({
+    mutationFn: async (order: number[]) => {
+      await apiRequest("POST", "/api/team/reorder", { order });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/team"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to reorder", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const moveItem = (index: number, direction: "up" | "down") => {
+    if (!members) return;
+    const newOrder = [...members];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+    [newOrder[index], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[index]];
+    reorderMembers.mutate(newOrder.map(m => m.id));
+  };
+
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/team/${id}`);
@@ -256,6 +277,7 @@ export default function TeamManagement() {
           <Table>
             <TableHeader>
               <TableRow>
+                {canManage && <TableHead className="w-[60px]"></TableHead>}
                 <TableHead>Name</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Email</TableHead>
@@ -265,8 +287,32 @@ export default function TeamManagement() {
             </TableHeader>
             <TableBody>
               {members && members.length > 0 ? (
-                members.map((member) => (
+                members.map((member, index) => (
                   <TableRow key={member.id}>
+                    {canManage && (
+                      <TableCell className="py-3 px-2 w-[60px]">
+                        <div className="flex flex-col gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 w-5 p-0"
+                            disabled={index === 0 || reorderMembers.isPending}
+                            onClick={() => moveItem(index, "up")}
+                          >
+                            <ArrowUp className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 w-5 p-0"
+                            disabled={index === members.length - 1 || reorderMembers.isPending}
+                            onClick={() => moveItem(index, "down")}
+                          >
+                            <ArrowDown className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <div
@@ -327,7 +373,7 @@ export default function TeamManagement() {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={canManage ? 5 : 4}
+                    colSpan={canManage ? 6 : 4}
                     className="text-center text-sm text-muted-foreground py-8"
                   >
                     No team members yet.
