@@ -49,6 +49,16 @@ export class Storage {
     return created;
   }
 
+  async updateTeamMember(id: number, updates: Partial<InsertTeamMember>): Promise<TeamMember | undefined> {
+    const [updated] = await this.db.update(teamMembers).set(updates).where(eq(teamMembers.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTeamMember(id: number): Promise<boolean> {
+    const result = await this.db.delete(teamMembers).where(eq(teamMembers.id, id)).returning();
+    return result.length > 0;
+  }
+
   // Phases
   async getPhases(): Promise<Phase[]> {
     return this.db.select().from(phases).orderBy(asc(phases.sortOrder));
