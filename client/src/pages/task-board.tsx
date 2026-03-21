@@ -147,6 +147,7 @@ function TaskDetailPanel({
   const [newComment, setNewComment] = useState("");
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(task.title);
   const [editingDesc, setEditingDesc] = useState(false);
@@ -158,15 +159,28 @@ function TaskDetailPanel({
     queryKey: ["/api/tasks", task.id, "comments"],
   });
 
+  const clientMembers = team.filter(m => m.isClient);
   const authErrorMsg = "Sign in at Team Login to make changes";
 
   const addComment = useMutation({
     mutationFn: async (data: { content: string; parentId?: number }) => {
-      if (!isAuthenticated) throw new Error(authErrorMsg);
-      await apiRequest("POST", `/api/tasks/${task.id}/comments`, {
-        ...data,
-        createdAt: new Date().toISOString(),
-      });
+      const body: any = { ...data, createdAt: new Date().toISOString() };
+      if (!isAuthenticated) {
+        if (!selectedClientId) throw new Error("Please select your name before commenting");
+        body.authorId = selectedClientId;
+        // Direct fetch without auth header for client comments
+        const res = await fetch(`/api/tasks/${task.id}/comments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(err || "Failed to post comment");
+        }
+      } else {
+        await apiRequest("POST", `/api/tasks/${task.id}/comments`, body);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", task.id, "comments"] });
@@ -395,7 +409,7 @@ function TaskDetailPanel({
                                 </span>
                               </div>
                               <LinkifyText text={comment.content} />
-                              {isAuthenticated && (
+                              {(isAuthenticated || selectedClientId) && (
                                 <button
                                   onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
                                   className="text-[11px] text-muted-foreground hover:text-foreground mt-1 transition-colors"
@@ -484,29 +498,58 @@ function TaskDetailPanel({
               )}
 
               {/* Add comment */}
-              <div className="mt-4 flex gap-2">
-                <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-semibold shrink-0 mt-1">
-                  {currentUser?.avatarInitials || "?"}
-                </div>
-                <div className="flex-1 space-y-2">
-                  <Textarea
-                    placeholder="Leave a comment..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    className="min-h-[72px] text-sm resize-none"
-                    data-testid="input-comment"
-                  />
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      onClick={() => newComment.trim() && addComment.mutate({ content: newComment.trim() })}
-                      disabled={!newComment.trim() || addComment.isPending}
-                      className="gap-1.5"
-                      data-testid="button-submit-comment"
+              <div className="mt-4 space-y-3">
+                {/* Client identity selector — only for non-authenticated users */}
+                {!isAuthenticated && clientMembers.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Commenting as:</span>
+                    <Select
+                      value={selectedClientId?.toString() || ""}
+                      onValueChange={(val) => setSelectedClientId(parseInt(val))}
                     >
-                      <Send className="w-3.5 h-3.5" />
-                      Comment
-                    </Button>
+                      <SelectTrigger className="w-[180px] h-8 text-xs">
+                        <SelectValue placeholder="Select your name" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clientMembers.map((member) => (
+                          <SelectItem key={member.id} value={member.id.toString()}>
+                            {member.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 mt-1 ${
+                    !isAuthenticated ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-primary/10 text-primary'
+                  }`}>
+                    {isAuthenticated
+                      ? (currentUser?.avatarInitials || "?")
+                      : (clientMembers.find(m => m.id === selectedClientId)?.avatarInitials || "?")
+                    }
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Textarea
+                      placeholder={isAuthenticated ? "Leave a comment..." : (selectedClientId ? "Leave a comment..." : "Select your name above to comment...")}
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      className="min-h-[72px] text-sm resize-none"
+                      disabled={!isAuthenticated && !selectedClientId}
+                      data-testid="input-comment"
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        onClick={() => newComment.trim() && addComment.mutate({ content: newComment.trim() })}
+                        disabled={!newComment.trim() || addComment.isPending || (!isAuthenticated && !selectedClientId)}
+                        className="gap-1.5"
+                        data-testid="button-submit-comment"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        Comment
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>

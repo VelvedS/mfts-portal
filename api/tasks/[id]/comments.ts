@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth, setCorsHeaders } from "../../_auth.js";
+import { setCorsHeaders } from "../../_auth.js";
 import { getStorage } from "../../_storage.js";
 import { insertCommentSchema } from "../../../shared/schema.js";
 
@@ -19,13 +19,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === "POST") {
-    // Auth required for posting comments
-    const user = await requireAuth(req, res);
-    if (!user) return;
+    const authHeader = req.headers.authorization;
+    let authorId: number;
+
+    if (authHeader?.startsWith("Bearer ")) {
+      // Authenticated user flow
+      const { getAuthUser } = await import("../../_auth.js");
+      const user = await getAuthUser(req);
+      if (!user) return res.status(401).json({ error: "Authentication required" });
+      authorId = user.teamMemberId || user.id;
+    } else {
+      // Client flow — must provide authorId
+      const clientAuthorId = req.body?.authorId;
+      if (!clientAuthorId) return res.status(400).json({ error: "authorId required for client comments" });
+      const member = await storage.getTeamMember(clientAuthorId);
+      if (!member || !member.isClient) return res.status(403).json({ error: "Only client team members can comment without auth" });
+      authorId = clientAuthorId;
+    }
+
     const parsed = insertCommentSchema.safeParse({
       ...req.body,
       taskId,
-      authorId: user.teamMemberId || user.id,
+      authorId,
     });
     if (!parsed.success) return res.status(400).json({ error: parsed.error });
     const comment = await storage.createComment(parsed.data);
