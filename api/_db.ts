@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import * as schema from "../shared/schema";
+import * as schema from "../shared/schema.js";
 
 // Connection pooling for serverless — reuse across warm invocations
 let pool: pg.Pool | null = null;

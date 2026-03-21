@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireTeamOrAdmin, setCorsHeaders } from "./_auth";
-import { getStorage } from "./_storage";
-import { insertTaskSchema } from "../shared/schema";
+import { requireTeamOrAdmin, setCorsHeaders } from "./_auth.js";
+import { getStorage } from "./_storage.js";
+import { insertTaskSchema } from "../shared/schema.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);

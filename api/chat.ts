@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth, setCorsHeaders } from "./_auth";
-import { getStorage } from "./_storage";
+import { requireAuth, setCorsHeaders } from "./_auth.js";
+import { getStorage } from "./_storage.js";
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic();

@@ -1,5 +1,5 @@
 import { eq, asc } from "drizzle-orm";
-import { getDb } from "./_db";
+import { getDb } from "./_db.js";
 import {
   users, teamMembers, phases, tasks, comments,
   type User, type InsertUser,
@@ -7,7 +7,7 @@ import {
   type Phase, type InsertPhase,
   type Task, type InsertTask,
   type Comment, type InsertComment,
-} from "../shared/schema";
+} from "../shared/schema.js";
 
 // Serverless storage — creates a fresh db handle per invocation
 export class Storage {

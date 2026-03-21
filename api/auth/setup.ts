@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getAuthUser, setCorsHeaders, getSupabaseAdmin } from "../_auth";
-import { getStorage } from "../_storage";
+import { getAuthUser, setCorsHeaders, getSupabaseAdmin } from "../_auth.js";
+import { getStorage } from "../_storage.js";
 
 /**
  * POST /api/auth/setup
@@ -49,8 +49,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   portalUser = await storage.getUserByEmail(supabaseUser.email!);
   if (portalUser) {
     // Link Supabase ID to existing portal user
-    const { getDb } = await import("../_db");
-    const { users } = await import("../../shared/schema");
+    const { getDb } = await import("../_db.js");
+    const { users } = await import("../../shared/schema.js");
     const { eq } = await import("drizzle-orm");
     const db = getDb();
     const [updated] = await db.update(users)

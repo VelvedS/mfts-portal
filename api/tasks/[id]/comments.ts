@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireAuth, setCorsHeaders } from "../../_auth";
-import { getStorage } from "../../_storage";
-import { insertCommentSchema } from "../../../shared/schema";
+import { requireAuth, setCorsHeaders } from "../../_auth.js";
+import { getStorage } from "../../_storage.js";
+import { insertCommentSchema } from "../../../shared/schema.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
