@@ -145,6 +145,8 @@ function TaskDetailPanel({
   onUpdated: () => void;
 }) {
   const [newComment, setNewComment] = useState("");
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(task.title);
   const [editingDesc, setEditingDesc] = useState(false);
@@ -159,10 +161,10 @@ function TaskDetailPanel({
   const authErrorMsg = "Sign in at Team Login to make changes";
 
   const addComment = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async (data: { content: string; parentId?: number }) => {
       if (!isAuthenticated) throw new Error(authErrorMsg);
       await apiRequest("POST", `/api/tasks/${task.id}/comments`, {
-        content,
+        ...data,
         createdAt: new Date().toISOString(),
       });
     },
@@ -363,31 +365,119 @@ function TaskDetailPanel({
                 <div className="space-y-3">{[1,2].map(i => <Skeleton key={i} className="h-16 rounded-lg" />)}</div>
               ) : comments && comments.length > 0 ? (
                 <div className="space-y-3">
-                  {comments.map((comment) => {
-                    const author = getMember(comment.authorId);
-                    const time = new Date(comment.createdAt);
-                    return (
-                      <div key={comment.id} className="flex gap-3" data-testid={`comment-${comment.id}`}>
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 mt-0.5 ${
-                          author?.isClient 
-                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' 
-                            : 'bg-primary/10 text-primary'
-                        }`}>
-                          {author?.avatarInitials || "?"}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-foreground">{author?.name || "Unknown"}</span>
-                            <span className="text-[11px] text-muted-foreground">
-                              {time.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at{' '}
-                              {time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                            </span>
+                  {(() => {
+                    const topLevel = comments.filter(c => !c.parentId);
+                    const replies = comments.filter(c => c.parentId);
+                    const getReplies = (parentId: number) => replies.filter(r => r.parentId === parentId);
+
+                    return topLevel.map((comment) => {
+                      const author = getMember(comment.authorId);
+                      const time = new Date(comment.createdAt);
+                      const commentReplies = getReplies(comment.id);
+
+                      return (
+                        <div key={comment.id} className="space-y-2">
+                          {/* Parent comment */}
+                          <div className="flex gap-3" data-testid={`comment-${comment.id}`}>
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 mt-0.5 ${
+                              author?.isClient
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                : 'bg-primary/10 text-primary'
+                            }`}>
+                              {author?.avatarInitials || "?"}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-foreground">{author?.name || "Unknown"}</span>
+                                <span className="text-[11px] text-muted-foreground">
+                                  {time.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at{' '}
+                                  {time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                </span>
+                              </div>
+                              <LinkifyText text={comment.content} />
+                              {isAuthenticated && (
+                                <button
+                                  onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+                                  className="text-[11px] text-muted-foreground hover:text-foreground mt-1 transition-colors"
+                                >
+                                  Reply
+                                </button>
+                              )}
+                            </div>
                           </div>
-                          <LinkifyText text={comment.content} />
+
+                          {/* Replies */}
+                          {commentReplies.length > 0 && (
+                            <div className="ml-10 space-y-2 border-l-2 border-border pl-3">
+                              {commentReplies.map((reply) => {
+                                const replyAuthor = getMember(reply.authorId);
+                                const replyTime = new Date(reply.createdAt);
+                                return (
+                                  <div key={reply.id} className="flex gap-2.5" data-testid={`comment-${reply.id}`}>
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-semibold shrink-0 mt-0.5 ${
+                                      replyAuthor?.isClient
+                                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                        : 'bg-primary/10 text-primary'
+                                    }`}>
+                                      {replyAuthor?.avatarInitials || "?"}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-semibold text-foreground">{replyAuthor?.name || "Unknown"}</span>
+                                        <span className="text-[11px] text-muted-foreground">
+                                          {replyTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at{' '}
+                                          {replyTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                      <LinkifyText text={reply.content} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Inline reply box */}
+                          {replyingTo === comment.id && (
+                            <div className="ml-10 pl-3 flex gap-2">
+                              <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[9px] font-semibold shrink-0 mt-1">
+                                {currentUser?.avatarInitials || "?"}
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                <Textarea
+                                  placeholder="Write a reply..."
+                                  value={replyText}
+                                  onChange={(e) => setReplyText(e.target.value)}
+                                  className="min-h-[56px] text-sm resize-none"
+                                  autoFocus
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="ghost" size="sm" onClick={() => { setReplyingTo(null); setReplyText(""); }}>
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      if (replyText.trim()) {
+                                        addComment.mutate({ content: replyText.trim(), parentId: comment.id });
+                                        setReplyingTo(null);
+                                        setReplyText("");
+                                      }
+                                    }}
+                                    disabled={!replyText.trim() || addComment.isPending}
+                                    className="gap-1.5"
+                                  >
+                                    <Send className="w-3.5 h-3.5" />
+                                    Reply
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    });
+                  })()}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No comments yet.</p>
@@ -409,7 +499,7 @@ function TaskDetailPanel({
                   <div className="flex justify-end">
                     <Button
                       size="sm"
-                      onClick={() => newComment.trim() && addComment.mutate(newComment.trim())}
+                      onClick={() => newComment.trim() && addComment.mutate({ content: newComment.trim() })}
                       disabled={!newComment.trim() || addComment.isPending}
                       className="gap-1.5"
                       data-testid="button-submit-comment"

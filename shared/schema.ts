@@ -56,6 +56,7 @@ export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
   taskId: integer("task_id").notNull(),
   authorId: integer("author_id").notNull(),
+  parentId: integer("parent_id"),
   content: text("content").notNull(),
   createdAt: text("created_at").notNull(),
 });
