@@ -160,11 +160,9 @@ function TaskDetailPanel({
     queryKey: ["/api/tasks", task.id, "comments"],
   });
 
-  const { data: taskFiles = [] } = useQuery<any[]>({
-    queryKey: ["/api/tasks", task.id, "files"],
-  });
-
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+  const allFiles = useQuery<any[]>({ queryKey: ["/api/files"] });
+  const taskFiles = (allFiles.data || []).filter((f: any) => f.taskId === task.id);
 
   const clientMembers = team.filter(m => m.isClient);
   const authErrorMsg = "Sign in at Team Login to make changes";

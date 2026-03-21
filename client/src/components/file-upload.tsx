@@ -70,7 +70,8 @@ export default function FileUpload({ taskId, files, teamMembers, supabaseUrl }: 
 
         if (uploadError) throw uploadError;
 
-        await apiRequest("POST", `/api/tasks/${taskId}/files`, {
+        await apiRequest("POST", "/api/files", {
+          taskId,
           name: file.name,
           storagePath: path,
           size: file.size,
@@ -79,7 +80,6 @@ export default function FileUpload({ taskId, files, teamMembers, supabaseUrl }: 
         });
       }
 
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId, "files"] });
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
       toast({ title: `${selectedFiles.length} file(s) uploaded` });
     } catch (err: any) {
@@ -99,7 +99,6 @@ export default function FileUpload({ taskId, files, teamMembers, supabaseUrl }: 
       await apiRequest("DELETE", `/api/files/${file.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", taskId, "files"] });
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
       toast({ title: "File deleted" });
     },
