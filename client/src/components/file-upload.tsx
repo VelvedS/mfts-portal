@@ -96,7 +96,7 @@ export default function FileUpload({ taskId, files, teamMembers, supabaseUrl }: 
       if (supabase) {
         await supabase.storage.from("project-files").remove([file.storagePath]);
       }
-      await apiRequest("DELETE", `/api/files/${file.id}`);
+      await apiRequest("DELETE", `/api/files?id=${file.id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
