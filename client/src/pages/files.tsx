@@ -1,11 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Image, FileSpreadsheet, File as FileIcon, Download, Search, Filter } from "lucide-react";
+import { FileText, Image, FileSpreadsheet, File as FileIcon, Download, Search, Filter, Upload, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useState, useRef, useCallback } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { getSupabaseClient } from "@/lib/supabase";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/lib/auth-context";
 import type { Phase, Task, TeamMember } from "@shared/schema";
 
 interface ProjectFile {
@@ -40,6 +46,15 @@ export default function FilesPage() {
   const [phaseFilter, setPhaseFilter] = useState<string>("all");
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
 
+  const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [showTaskPicker, setShowTaskPicker] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { data: files, isLoading: filesLoading } = useQuery<ProjectFile[]>({ queryKey: ["/api/files"] });
   const { data: tasks } = useQuery<Task[]>({ queryKey: ["/api/tasks"] });
   const { data: phases } = useQuery<Phase[]>({ queryKey: ["/api/phases"] });
@@ -60,13 +75,87 @@ export default function FilesPage() {
 
   const totalSize = filteredFiles.reduce((sum, f) => sum + f.size, 0);
 
+  const handleFilesSelected = (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    setPendingFiles(Array.from(fileList));
+    setShowTaskPicker(true);
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    handleFilesSelected(e.dataTransfer.files);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+  }, []);
+
+  const handleUpload = async () => {
+    if (!selectedTaskId || pendingFiles.length === 0) return;
+    const taskId = parseInt(selectedTaskId);
+    setUploading(true);
+    try {
+      const supabase = await getSupabaseClient();
+      if (!supabase) throw new Error("Supabase not configured");
+
+      for (const file of pendingFiles) {
+        const path = `tasks/${taskId}/${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage.from("project-files").upload(path, file);
+        if (uploadError) throw uploadError;
+
+        await apiRequest("POST", "/api/files", {
+          taskId,
+          name: file.name,
+          storagePath: path,
+          size: file.size,
+          mimeType: file.type,
+          uploadedBy: user?.teamMemberId || user?.id || 0,
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/files"] });
+      toast({ title: `${pendingFiles.length} file(s) uploaded` });
+      setShowTaskPicker(false);
+      setPendingFiles([]);
+      setSelectedTaskId("");
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Project Files</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {filteredFiles.length} file{filteredFiles.length !== 1 ? "s" : ""} · {formatFileSize(totalSize)} total
-        </p>
+    <div
+      className={`p-6 max-w-5xl mx-auto space-y-6 min-h-full transition-colors ${dragOver ? "bg-primary/5" : ""}`}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Project Files</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {filteredFiles.length} file{filteredFiles.length !== 1 ? "s" : ""} · {formatFileSize(totalSize)} total
+          </p>
+        </div>
+        {isAuthenticated && (
+          <div>
+            <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFilesSelected(e.target.files)} />
+            <Button className="gap-2" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="w-4 h-4" />
+              Upload Files
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3">
@@ -156,9 +245,70 @@ export default function FilesPage() {
         <div className="text-center py-12">
           <FileIcon className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm font-medium text-foreground">No files yet</p>
-          <p className="text-xs text-muted-foreground mt-1">Upload files from any task detail view</p>
+          <p className="text-xs text-muted-foreground mt-1">Upload files from any task detail view or drag and drop here</p>
         </div>
       )}
+
+      {dragOver && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm pointer-events-none">
+          <div className="flex flex-col items-center gap-3 p-8 rounded-xl border-2 border-dashed border-primary bg-primary/5">
+            <Upload className="w-10 h-10 text-primary" />
+            <p className="text-lg font-medium text-foreground">Drop files to upload</p>
+            <p className="text-sm text-muted-foreground">Files will be assigned to a task</p>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={showTaskPicker} onOpenChange={(open) => { if (!open) { setShowTaskPicker(false); setPendingFiles([]); setSelectedTaskId(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign files to a task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">
+                {pendingFiles.length} file{pendingFiles.length !== 1 ? "s" : ""} selected:
+              </p>
+              <div className="space-y-1 max-h-32 overflow-auto">
+                {pendingFiles.map((f, i) => (
+                  <p key={i} className="text-xs text-foreground truncate">{f.name}</p>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground mb-2">Which task are these for?</p>
+              <Select value={selectedTaskId} onValueChange={setSelectedTaskId}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Select a task..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {phases?.map(phase => {
+                    const phaseTasks = tasks?.filter(t => t.phaseId === phase.id) || [];
+                    if (phaseTasks.length === 0) return null;
+                    return (
+                      <div key={phase.id}>
+                        <p className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{phase.name}</p>
+                        {phaseTasks.map(task => (
+                          <SelectItem key={task.id} value={task.id.toString()}>{task.title}</SelectItem>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setShowTaskPicker(false); setPendingFiles([]); setSelectedTaskId(""); }}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpload} disabled={!selectedTaskId || uploading} className="gap-2">
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {uploading ? "Uploading..." : "Upload"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
