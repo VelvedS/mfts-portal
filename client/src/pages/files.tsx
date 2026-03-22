@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useState, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -50,9 +49,6 @@ export default function FilesPage() {
   const { user, isAuthenticated } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [showTaskPicker, setShowTaskPicker] = useState(false);
-  const [selectedTaskId, setSelectedTaskId] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: files, isLoading: filesLoading } = useQuery<ProjectFile[]>({ queryKey: ["/api/files"] });
@@ -69,23 +65,48 @@ export default function FilesPage() {
   const filteredFiles = files?.filter(file => {
     const matchesSearch = !search || file.name.toLowerCase().includes(search.toLowerCase());
     if (phaseFilter === "all") return matchesSearch;
-    const task = getTask(file.taskId);
+    const task = file.taskId ? getTask(file.taskId) : null;
     return matchesSearch && task?.phaseId === parseInt(phaseFilter);
   }) || [];
 
   const totalSize = filteredFiles.reduce((sum, f) => sum + f.size, 0);
 
-  const handleFilesSelected = (fileList: FileList | null) => {
+  const handleFilesSelected = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
-    setPendingFiles(Array.from(fileList));
-    setShowTaskPicker(true);
+    setUploading(true);
+    try {
+      const supabase = await getSupabaseClient();
+      if (!supabase) throw new Error("Supabase not configured");
+
+      for (const file of Array.from(fileList)) {
+        const path = `general/${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage.from("project-files").upload(path, file);
+        if (uploadError) throw uploadError;
+
+        await apiRequest("POST", "/api/files", {
+          name: file.name,
+          storagePath: path,
+          size: file.size,
+          mimeType: file.type,
+          uploadedBy: user?.teamMemberId || user?.id || 0,
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/files"] });
+      toast({ title: `${fileList.length} file(s) uploaded` });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     handleFilesSelected(e.dataTransfer.files);
-  }, []);
+  }, [user]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -96,42 +117,6 @@ export default function FilesPage() {
     e.preventDefault();
     setDragOver(false);
   }, []);
-
-  const handleUpload = async () => {
-    if (!selectedTaskId || pendingFiles.length === 0) return;
-    const taskId = parseInt(selectedTaskId);
-    setUploading(true);
-    try {
-      const supabase = await getSupabaseClient();
-      if (!supabase) throw new Error("Supabase not configured");
-
-      for (const file of pendingFiles) {
-        const path = `tasks/${taskId}/${Date.now()}-${file.name}`;
-        const { error: uploadError } = await supabase.storage.from("project-files").upload(path, file);
-        if (uploadError) throw uploadError;
-
-        await apiRequest("POST", "/api/files", {
-          taskId,
-          name: file.name,
-          storagePath: path,
-          size: file.size,
-          mimeType: file.type,
-          uploadedBy: user?.teamMemberId || user?.id || 0,
-        });
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["/api/files"] });
-      toast({ title: `${pendingFiles.length} file(s) uploaded` });
-      setShowTaskPicker(false);
-      setPendingFiles([]);
-      setSelectedTaskId("");
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
 
   return (
     <div
@@ -191,7 +176,7 @@ export default function FilesPage() {
           <CardContent className="p-0 divide-y divide-border">
             {filteredFiles.map(file => {
               const IconComponent = getFileIcon(file.mimeType);
-              const task = getTask(file.taskId);
+              const task = file.taskId ? getTask(file.taskId) : null;
               const phase = task ? getPhase(task.phaseId) : null;
               const uploader = getMember(file.uploadedBy);
               return (
@@ -254,61 +239,11 @@ export default function FilesPage() {
           <div className="flex flex-col items-center gap-3 p-8 rounded-xl border-2 border-dashed border-primary bg-primary/5">
             <Upload className="w-10 h-10 text-primary" />
             <p className="text-lg font-medium text-foreground">Drop files to upload</p>
-            <p className="text-sm text-muted-foreground">Files will be assigned to a task</p>
+            <p className="text-sm text-muted-foreground">Drop files to upload to the project</p>
           </div>
         </div>
       )}
 
-      <Dialog open={showTaskPicker} onOpenChange={(open) => { if (!open) { setShowTaskPicker(false); setPendingFiles([]); setSelectedTaskId(""); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Assign files to a task</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">
-                {pendingFiles.length} file{pendingFiles.length !== 1 ? "s" : ""} selected:
-              </p>
-              <div className="space-y-1 max-h-32 overflow-auto">
-                {pendingFiles.map((f, i) => (
-                  <p key={i} className="text-xs text-foreground truncate">{f.name}</p>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground mb-2">Which task are these for?</p>
-              <Select value={selectedTaskId} onValueChange={setSelectedTaskId}>
-                <SelectTrigger className="text-sm">
-                  <SelectValue placeholder="Select a task..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {phases?.map(phase => {
-                    const phaseTasks = tasks?.filter(t => t.phaseId === phase.id) || [];
-                    if (phaseTasks.length === 0) return null;
-                    return (
-                      <div key={phase.id}>
-                        <p className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{phase.name}</p>
-                        {phaseTasks.map(task => (
-                          <SelectItem key={task.id} value={task.id.toString()}>{task.title}</SelectItem>
-                        ))}
-                      </div>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => { setShowTaskPicker(false); setPendingFiles([]); setSelectedTaskId(""); }}>
-                Cancel
-              </Button>
-              <Button onClick={handleUpload} disabled={!selectedTaskId || uploading} className="gap-2">
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                {uploading ? "Uploading..." : "Upload"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

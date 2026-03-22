@@ -62,10 +62,10 @@ export const comments = pgTable("comments", {
   createdAt: text("created_at").notNull(),
 });
 
-// Files attached to tasks (stored in Supabase Storage)
+// Files (stored in Supabase Storage, optionally linked to a task)
 export const files = pgTable("files", {
   id: serial("id").primaryKey(),
-  taskId: integer("task_id").notNull(),
+  taskId: integer("task_id"),
   name: text("name").notNull(),
   storagePath: text("storage_path").notNull(),
   size: integer("size").notNull().default(0),

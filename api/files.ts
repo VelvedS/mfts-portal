@@ -22,9 +22,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // POST /api/files — create file metadata
   if (req.method === "POST") {
     const { taskId, name, storagePath, size, mimeType, uploadedBy } = req.body;
-    if (!taskId || !name || !storagePath) return res.status(400).json({ error: "taskId, name, and storagePath required" });
+    if (!name || !storagePath) return res.status(400).json({ error: "name and storagePath required" });
     const file = await storage.createFile({
-      taskId,
+      taskId: taskId || null,
       name,
       storagePath,
       size: size || 0,
