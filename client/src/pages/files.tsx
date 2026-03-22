@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { FileText, Image, FileSpreadsheet, File as FileIcon, Download, Search, Filter, Upload, Loader2 } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { FileText, Image, FileSpreadsheet, File as FileIcon, Download, Search, Filter, Upload, Loader2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +50,23 @@ export default function FilesPage() {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const deleteFile = useMutation({
+    mutationFn: async (file: ProjectFile) => {
+      const supabase = await getSupabaseClient();
+      if (supabase) {
+        await supabase.storage.from("project-files").remove([file.storagePath]);
+      }
+      await apiRequest("DELETE", `/api/files?id=${file.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/files"] });
+      toast({ title: "File deleted" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    },
+  });
 
   const { data: files, isLoading: filesLoading } = useQuery<ProjectFile[]>({ queryKey: ["/api/files"] });
   const { data: tasks } = useQuery<Task[]>({ queryKey: ["/api/tasks"] });
@@ -220,6 +237,17 @@ export default function FilesPage() {
                     >
                       <Download className="w-4 h-4" />
                     </a>
+                    {isAuthenticated && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-muted-foreground hover:text-red-500"
+                        onClick={() => deleteFile.mutate(file)}
+                        disabled={deleteFile.isPending}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               );
