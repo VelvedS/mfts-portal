@@ -311,7 +311,8 @@ export default function Timeline() {
       {/* Gantt-style Chart — dynamic date range */}
       {!isLoading && (
         <Card className="border border-card-border overflow-hidden">
-          <CardContent className="p-0">
+          <CardContent className="p-0 overflow-x-auto">
+            <div className="min-w-[800px]">
             {/* Month headers */}
             <div className="flex border-b border-border relative">
               <div className="w-56 shrink-0 px-4 py-2 border-r border-border">
@@ -406,6 +407,7 @@ export default function Timeline() {
                 </div>
               );
             })}
+            </div>
           </CardContent>
         </Card>
       )}

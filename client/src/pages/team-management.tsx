@@ -273,7 +273,7 @@ export default function TeamManagement() {
       {isLoading ? (
         <div className="text-sm text-muted-foreground">Loading...</div>
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden">
+        <div className="rounded-xl border border-border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>

@@ -160,7 +160,7 @@ export default function FilesPage() {
         )}
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -220,7 +220,7 @@ export default function FilesPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="hidden sm:flex items-center gap-2 shrink-0">
                     {phase && (
                       <Badge variant="outline" className="text-[10px] font-normal">
                         {phase.name}
